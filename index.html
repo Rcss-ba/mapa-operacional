@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de Acompanhamento Operacional</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --papel:#ffffff; --tinta:#1b1b1b; --pessego:#f8cbad; --ouro:#f0b429; --cinza:#a6a6a6;
+  --obs:#595959; --verde:#33ee33; --vermelho:#e00000; --amarelo:#ffff00; --lima:#00e000; --ciano:#33ccff; --bronze:#d9a21b;
+  --linha:#9a9a9a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:13px/1.35 "Segoe UI",Roboto,Arial,Helvetica,sans-serif;color:var(--tinta);background:#efefef;display:flex;flex-direction:row;overflow:hidden}
+#main{flex:1 1 auto;min-width:0;height:100%;display:flex;flex-direction:column}
+/* menu lateral escuro */
+#nav{flex:0 0 190px;width:190px;background:#2b2623;color:#e9e2da;display:flex;flex-direction:column;overflow:auto}
+#nav .marca{padding:16px 16px 10px}
+#nav .marca b{display:block;font-size:16px;letter-spacing:.5px;color:#fff}
+#nav .marca span{font-size:11px;opacity:.75}
+#nav .usuario{display:flex;align-items:center;gap:10px;margin:8px 10px 14px;padding:10px 8px;font-size:12px;border-radius:6px;background:#352f2b}
+#nav .usuario i{flex:0 0 30px;height:30px;border-radius:50%;background:#7a6a5b;display:grid;place-items:center;font-style:normal;font-weight:700;color:#fff}
+#nav .usuario em{display:block;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#navItens{display:flex;flex-direction:column;gap:2px;padding:0 10px}
+#navItens button{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:0;border-radius:5px;background:transparent;color:#e9e2da;font-size:13px;text-align:left;cursor:pointer}
+#navItens button svg{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#navItens button:hover{background:#3a332e}
+#navItens button.on{background:#6b5a4b;color:#fff}
+#navSair{width:100%;padding:10px 12px;border:1px solid #6b5a4b;border-radius:5px;background:transparent;color:#e9e2da;font-size:13px;text-align:left;cursor:pointer}
+#navSair:hover{background:#3a332e}
+#nav .rodape{margin-top:auto;padding:14px 16px;font-size:11px;opacity:.6}
+body.nav-recolhida #nav{display:none}
+/* usuário só leitor: sem formulários */
+body.leitor #painel,body.leitor #navItens,body.leitor #btnVisao{display:none!important}
+/* modo TV: somente leitura, tela cheia */
+#tvInfo{display:none}
+body.tv #nav,body.tv .barra,body.tv #painel{display:none!important}
+body.tv #app{padding:0;gap:0}
+body.tv #corpoBox{border-radius:0;box-shadow:none}
+body.tv #tvInfo{display:block;position:fixed;right:10px;bottom:6px;z-index:50;font-size:12px;color:#444;background:rgba(255,255,255,.85);padding:2px 8px;border-radius:4px}
+body.tv #tvInfo a{color:#6f6050;opacity:.7}
+button,input,select,textarea{font:inherit}
+.barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;background:linear-gradient(100deg,#4a3d33 0%,#7a6a5a 55%,#5a4a3d 100%);color:#fff;flex:0 0 auto;z-index:20;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.barra #btnMenu{width:32px;height:32px;padding:0;border-radius:50%;background:#fff;color:#4a3d33;border:0;font-size:18px;line-height:1;font-weight:700}
+.barra #btnMenu:hover{background:#eee}
+.barra h1{font-size:15px;margin:0 auto 0 4px;font-weight:600;letter-spacing:.3px}
+.barra input,.barra button{padding:5px 10px;font-size:12px;border-radius:4px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.25);color:#fff}
+.barra button{cursor:pointer}
+.barra button:hover{background:rgba(0,0,0,.4)}
+.barra button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable]:focus-visible{outline:2px solid #1d6fe0;outline-offset:1px}
+#estado{font-size:12px;opacity:.8}
+#login,#definirSenha{max-width:340px;margin:12vh auto;background:#fff;padding:24px;border-radius:8px;display:none;box-shadow:0 2px 14px rgba(0,0,0,.15)}
+#login h2,#definirSenha h2{margin:0 0 14px;font-size:18px}
+#login label,#definirSenha label{display:block;margin:10px 0 4px}
+#login input,#definirSenha input{width:100%;padding:8px;border:1px solid #aaa;border-radius:4px}
+#login button,#definirSenha button{margin-top:16px;width:100%;padding:9px;background:#4d3f34;color:#fff;border:0;border-radius:4px;cursor:pointer}
+#erro,#erro2{color:#b00020;margin-top:10px;min-height:1em}
+#app{display:none;flex:1 1 auto;min-height:0;gap:8px;padding:8px}
+#painel{flex:0 0 260px;width:260px;overflow:auto;background:#fff;border-radius:4px;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+#abas{display:none}
+#corpoBox{flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;position:relative;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.lancar{display:block}
+.card{display:none;padding:0 12px 14px}
+.card.on{display:block}
+.card h3{margin:0 -12px 10px;padding:11px 14px;background:#6f6050;color:#fff;font-size:14px;font-weight:600}
+.card label{display:block;margin:6px 0 2px;font-size:12px;color:#444}
+.card input,.card select{width:100%;padding:6px;border:1px solid #aaa;border-radius:4px;background:#fff}
+.card .lin{display:flex;gap:8px}
+.card button{margin-top:10px;padding:7px 12px;background:#4d3f34;color:#fff;border:0;border-radius:4px;cursor:pointer}
+.card button.sec{background:#fff;color:#4d3f34;border:1px solid #4d3f34;margin-left:6px}
+.dica{font-size:11px;color:#666;margin-top:4px}
+.corpo{display:flex;gap:10px;align-items:stretch;width:max-content;transform-origin:0 0;padding:4px}
+.rolagem{overflow:visible;background:#fff;padding:2px 2px 0;flex:0 0 auto;display:flex;flex-direction:column}
+.lateral{width:300px;flex:0 0 300px;display:flex;flex-direction:column;gap:12px}
+table{border-collapse:collapse}
+.mapa,.pros{table-layout:fixed}
+.mapa td,.mapa th,.lateral td,.lateral th,.pros td,.pros th{border:1px solid var(--linha);padding:0;text-align:center;font-size:11px}
+.titulo{font-size:20px;font-weight:700;text-align:center;padding:4px;border:0!important}
+.mes{background:var(--cinza);color:#fff;font-size:18px;font-weight:700;padding:3px!important}
+.mapa th.ev{background:var(--pessego);font-size:17px;width:270px}
+.mapa th.dia{background:var(--pessego);font-weight:700;font-size:13px;width:28px}
+.mapa th.sem{background:var(--pessego);font-size:8px;height:16px}
+.mapa th.fds{background:var(--ouro)}
+.mapa th.obs{background:var(--pessego);font-size:15px;width:110px}
+.mapa td.nome{text-align:left;padding:1px 4px;font-size:11px;white-space:nowrap;position:relative}
+.mapa td.nome .x{display:none;position:absolute;right:2px;top:0;cursor:pointer;color:#b00020;font-weight:700}
+.mapa tr:hover td.nome .x{display:inline}
+.mapa td.c{position:relative;height:19px;cursor:pointer;color:#fff;font-weight:700;font-size:10px}
+.mapa td.c.fds{background:#fbd9a8}
+.mapa td.c.mk{background:var(--vermelho)}
+.mapa td.c.fora{background:#ddd;cursor:default}
+.mapa td.c[data-s]::after{content:attr(data-s);position:absolute;right:1px;bottom:0;font-size:6px;line-height:1;font-weight:700;color:#fff;pointer-events:none}
+.mapa td.o.multi{cursor:help;white-space:nowrap}
+.mapa td.o[data-pop]{cursor:help}
+/* alertas de data: 1 dia antes (vermelho/preto) e dia da execução a confirmar (laranja/azul) */
+.mapa td.c.al-d1,.lateral td.al-d1{background:#e00000!important;color:#fff!important}
+.mapa td.c.al-conf,.lateral td.al-conf{background:#ff9800!important;color:#000!important}
+body.pisca .mapa td.c.al-d1,body.pisca .lateral td.al-d1{background:#000!important;color:#ffee00!important}
+body.pisca .mapa td.c.al-conf,body.pisca .lateral td.al-conf{background:#0b3d91!important;color:#fff!important}
+.mapa td.c.al-d1,.mapa td.c.al-conf,.lateral td.al-d1,.lateral td.al-conf{cursor:pointer;font-weight:700}
+#conf{display:none;position:fixed;z-index:300;width:300px;background:#fff;color:#222;border-radius:6px;box-shadow:0 8px 26px rgba(0,0,0,.4);border:1px solid #bdb3a8;font-size:13px}
+#conf .ct{background:#ff9800;color:#000;font-weight:700;padding:8px 12px}
+#conf .cb{padding:10px 12px}
+#conf .cb p{margin:0 0 8px}
+#conf button{display:block;width:100%;margin:5px 0;padding:8px 10px;border:0;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;color:#fff;background:#4d3f34;text-align:left}
+#conf button.ok{background:#1f9d3a}
+#conf button.re{background:#7a3fb0}
+#conf button.no{background:#222}
+#conf button.red{background:#c0392b}
+#conf button.dep{background:#fff;color:#4d3f34;border:1px solid #4d3f34}
+#conf input{width:100%;padding:6px;border:1px solid #aaa;border-radius:4px;margin:4px 0}
+#conf .lin{display:flex;gap:6px}
+#conf .lin button{margin:4px 0}
+.chip{display:inline-block;padding:1px 4px;margin:0 1px;border-radius:3px;color:#fff;font-size:8px;font-weight:700;line-height:1.3;letter-spacing:.2px}
+#pop{display:none;position:fixed;z-index:200;min-width:250px;max-width:340px;max-height:70vh;overflow:auto;background:#fff;color:#222;border-radius:6px;box-shadow:0 6px 22px rgba(0,0,0,.35);border:1px solid #bdb3a8;font-size:13px}
+#pop .pt{background:#6f6050;color:#fff;font-weight:700;padding:8px 12px;font-size:13px}
+#pop .pr{padding:7px 12px;border-bottom:1px solid #e4e0db;font-size:12px;color:#444}
+#pop table{width:100%;border-collapse:collapse}
+#pop td{padding:5px 8px;border-bottom:1px solid #f0ece8;font-size:12.5px}
+#pop td.pd{font-weight:700;padding-left:12px;width:30px}
+#pop td.ps{color:#777;font-size:11px;width:34px}
+#pop td.pq{color:#444;width:60px}
+#pop .chip.g{font-size:11.5px;padding:3px 8px;letter-spacing:.3px}
+#pop .pr .chip{font-size:10.5px;padding:2px 6px}
+.mapa td.o{background:var(--obs);color:var(--verde);font-weight:700;font-size:10px;padding:0 3px}
+.pros{margin-top:10px}
+.pros caption{font-weight:700;font-size:12px;padding:3px;background:#fff}
+.pros th{background:var(--pessego);font-size:12px;width:28px}
+.pros th.sem{font-size:8px;background:var(--pessego)}
+.pros th.fds{background:var(--ouro)}
+.pros td{height:19px;font-weight:700;font-size:10px}
+.pros td.nm{border:0;text-align:right;font-weight:700;font-size:10px;padding-right:6px;white-space:nowrap;overflow:hidden}
+.pros .p1{background:var(--amarelo)}
+.pros .p2{background:var(--lima);color:#054}
+.pros .p3{background:var(--bronze)}
+.pros .p4{background:var(--ciano)}
+.pros td.fds{background:#fbd9a8}
+.pros sup.ci{font-size:7px;line-height:0;margin-left:1px}
+.pros td.sp{padding:0}
+.pros .sp .m{display:flex;height:15px}
+.pros .sp .m span{flex:1;font-size:8px;line-height:15px;overflow:hidden}
+.pros .sp .m span.p1{background:var(--amarelo)}
+.pros .sp .m span.p2{background:var(--lima);color:#054}
+.pros .sp .m span.p3{background:var(--bronze)}
+.pros .sp .m span.p4{background:var(--ciano)}
+.pros .sp .m span.v{background:transparent}
+.pros td.gu.ed{cursor:text}
+.pros td.gu.ed:focus{outline:2px solid #1d6fe0;outline-offset:-2px}
+.pros td.gu{font-size:13px;color:var(--vermelho);height:24px}
+.pros tr.disp td.gu{background:var(--amarelo)}
+.pros tr.nec td.gu{background:var(--lima)}
+.pros tr.nec td.gu.alerta{background:#e00000;color:#ffffff}
+body.pisca .pros tr.nec td.gu.alerta{background:#000000;color:#ffee00}
+.lateral table{width:100%}
+.lateral th.t{background:#e9e9e9;font-size:13px;padding:3px}
+.lateral th.t.r{background:#fff;font-size:15px}
+.lateral td,.lateral th{padding:2px 3px}
+.lateral td[contenteditable]{min-height:16px}
+.checks{display:grid;grid-template-columns:repeat(4,1fr);gap:2px 6px;margin:4px 0}
+.checks label{display:flex;align-items:center;gap:3px;margin:0;font-size:11px;color:#222}
+.checks input{width:auto}
+.lateral td.rv-ok{color:#0a7a0a;font-weight:700}
+.lateral td.rv-nao{background:#000;color:#fff;font-weight:700}
+.lateral td.rv-prev{font-weight:700;color:#222}
+.lateral td.rv-red{background:#ffff00;color:#e00000;font-weight:700}
+.lateral td.rv-ext{background:#e00000;color:#fff;font-weight:700}
+.lateral td.auto{font-weight:700;background:#f3f3f3}
+.lateral td.red{background:var(--vermelho);color:#fff}
+.lateral .ed{min-height:46px;text-align:left;padding:4px;font-size:12px}
+.obsbox{margin-top:auto;padding-top:10px;font-size:12px;flex:0 0 auto;display:flex;flex-direction:column}
+.opx{display:flex;flex-direction:column;flex:1 1 auto;border:1px solid var(--linha);background:#fff}
+.opx .th{background:#e9e9e9;text-align:center;font-weight:700;font-size:13px;padding:3px;border-bottom:1px solid var(--linha)}
+.opx .ed{flex:1 1 auto;min-height:46px;text-align:left;padding:4px;font-size:12px;white-space:pre-wrap}
+.obsbox > b{display:block;text-align:center;margin-bottom:4px}   /* só o título "OBSERVAÇÕES", não o negrito do texto */
+.obsbox .rt{flex:0 0 auto;height:72px;overflow-y:auto;padding:4px;border:1px dashed #bbb}
+.rt{white-space:pre-wrap;word-break:break-word;text-align:left}
+.rt ul,.rt ol{margin:2px 0;padding-left:20px}
+.rt p,.rt div{margin:0}
+#fmt{display:none;position:fixed;z-index:400;gap:2px;background:#2b2623;padding:3px;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,.35)}
+#fmt button{border:0;background:transparent;color:#fff;min-width:30px;height:26px;border-radius:4px;cursor:pointer;font-size:13px}
+#fmt button:hover{background:#6b5a4b}
+@media (max-width:800px){#app{flex-direction:column}#painel{flex:0 0 auto;width:100%;max-height:42vh}#nav{position:fixed;z-index:60;height:100%}}
+@media print{
+  @page{size:landscape;margin:8mm}
+  .barra,#painel,#login,#nav,#pop{display:none!important}
+  #main{display:block;height:auto}
+  #tvInfo,#conf,#fmt{display:none!important}
+  .mapa td.c.al-d1,.lateral td.al-d1,body.pisca .mapa td.c.al-d1,body.pisca .lateral td.al-d1{background:#e00000!important;color:#fff!important}
+  .mapa td.c.al-conf,.lateral td.al-conf,body.pisca .mapa td.c.al-conf,body.pisca .lateral td.al-conf{background:#ff9800!important;color:#000!important}
+  html,body{height:auto}
+  body{background:#fff;display:block;overflow:visible}
+  #app{display:block!important;padding:0}
+  #corpoBox{border:0;overflow:hidden;flex:none}
+  .mapa td.nome .x{display:none!important}
+  body.pisca .pros tr.nec td.gu.alerta{background:#e00000;color:#ffffff}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <div class="marca"><b>MAPA OPERACIONAL</b><span>Acompanhamento operacional</span></div>
+  <div class="usuario"><i id="navIni">M</i><div style="min-width:0;overflow:hidden"><em id="navUser">Modo local</em><small id="navModo" style="display:block;opacity:.7;font-size:10px;margin-top:2px"></small></div></div>
+  <div id="navItens"></div>
+  <div style="padding:10px"><button id="navSair" type="button" style="display:none">&#x238B;&nbsp; Sair da conta</button></div>
+  <div class="rodape">Lançamentos do mapa</div>
+</nav>
+
+<div id="main">
+<div class="barra">
+  <button id="btnMenu" type="button" aria-label="Mostrar ou ocultar o menu" title="Menu">&#8942;</button>
+  <h1>Mapa de Acompanhamento Operacional</h1>
+  <span id="estado"></span>
+  <button id="btnVisao">Tela cheia do mapa</button>
+  <button id="btnTV" title="Abre o mapa em tela cheia, somente leitura, com atualização automática">Modo TV</button>
+  <button id="btnImp">Imprimir / PDF</button>
+  <button id="btnSair" style="display:none">Sair</button>
+</div>
+
+<form id="login" autocomplete="on">
+  <h2>Entrar</h2>
+  <label for="em">E-mail</label>
+  <input id="em" type="email" autocomplete="username" required>
+  <label for="sn">Senha</label>
+  <input id="sn" type="password" autocomplete="current-password" required>
+  <label style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px"><input id="verSn" type="checkbox" style="width:auto"> Mostrar senha</label>
+  <button type="submit">Entrar</button>
+  <div style="text-align:center;margin-top:12px"><a href="#" id="esqueci" style="font-size:12px;color:#6f6050">Esqueci a senha</a></div>
+  <div id="erro" role="alert"></div>
+  <div id="aviso" style="color:#8a5a00;font-size:12px;margin-top:8px"></div>
+</form>
+
+<form id="definirSenha" autocomplete="on" style="display:none">
+  <h2>Criar sua senha</h2>
+  <p id="defInfo" style="margin:0 0 6px;font-size:12px;color:#555"></p>
+  <label for="nsn">Nova senha (mínimo 8 caracteres)</label>
+  <input id="nsn" type="password" autocomplete="new-password" required minlength="8">
+  <label for="nsn2">Repita a senha</label>
+  <input id="nsn2" type="password" autocomplete="new-password" required minlength="8">
+  <label style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px"><input id="verNsn" type="checkbox" style="width:auto"> Mostrar senhas</label>
+  <button type="submit">Salvar senha e entrar</button>
+  <div id="erro2" role="alert" style="color:#b00020;margin-top:10px;min-height:1em"></div>
+</form>
+
+<div id="app">
+  <aside id="painel"><div id="abas"></div>
+  <div class="lancar">
+    <div class="card">
+      <h3>Mês do mapa</h3>
+      <label for="selMes">Mês</label>
+      <select id="selMes"></select>
+      <label for="anoMes">Ano</label>
+      <input id="anoMes" type="number" min="2000" max="2100">
+      <button id="bMesAnt" class="sec" style="margin-left:0">‹ Anterior</button><button id="bMesPro" class="sec">Próximo ›</button>
+      <div class="dica">Ao trocar, o espelho recalcula os dias e os dias da semana automaticamente.</div>
+    </div>
+
+    <div class="card">
+      <h3>Lançar evento</h3>
+      <label for="fEv">Evento (banco de eventos)</label>
+      <select id="fEv"></select>
+      <label for="fDias">Dias</label>
+      <input id="fDias" placeholder="ex.: 5, 12-15, todos">
+      <div class="lin">
+        <div style="flex:1"><label for="fVal">QTD de GU</label><input id="fVal" placeholder="vazio = só pinta"></div>
+        <div style="flex:1"><label for="fObs">Situação (coluna OBS)</label><input id="fObs" list="obsOpc" placeholder="EXECUTADA"></div>
+      </div>
+      <datalist id="obsOpc"><option value="EXECUTADA"><option value="ENVIADA"><option value="FECHADA"><option value="DIARIAMENTE"><option value="SEMANALMENTE"><option value="ININTERRUPTA"><option value="PENDENTE"><option value="AGU. EXECUÇÃO"><option value="NO PRAZO"><option value="REDESIGNADO"></datalist>
+      <button id="bEv">Lançar</button><button id="bEvLimpa" class="sec">Limpar dias</button><button id="bEvDel" class="sec">Remover do banco</button>
+      <div class="dica">O evento é criado em "Novo evento" e fica no banco para todos os meses. Se ainda não estiver no mapa do mês, a linha é criada ao lançar. A situação vale só para os dias lançados: linhas com mais de uma situação mostram as siglas na coluna OBS e em cada dia.</div>
+    </div>
+
+    <div class="card">
+      <h3>Novo evento (linha)</h3>
+      <label for="nNome">Nome do evento</label>
+      <input id="nNome" placeholder="ESCOLTA X Y">
+      <button id="bNovo">Cadastrar no banco</button>
+      <div class="dica">Cadastra o nome. Datas, QTD de GU e situação são lançados em "Lançar evento".</div>
+    </div>
+
+    <div class="card">
+      <h3>Prospecto: pelotão</h3>
+      <label for="pPel">Pelotão</label>
+      <select id="pPel"><option value="1">1º</option><option value="2">2º</option><option value="3">3º</option><option value="4">4º</option></select>
+      <label for="pCiclo">Ciclo de serviço</label>
+      <select id="pCiclo"><option value="u">Ciclo Único</option><option value="c1">1º Ciclo</option><option value="c2">2º Ciclo</option></select>
+      <label for="pDias">Dias</label>
+      <input id="pDias" placeholder="ex.: 1-4, 17-20">
+      <button id="bPel">Lançar</button><button id="bPelLimpa" class="sec">Limpar dias</button>
+      <div class="dica">A célula do dia é preenchida por inteiro. 1º Ciclo aparece como 1º¹ e 2º Ciclo como 1º².</div>
+    </div>
+
+    <div class="card">
+      <h3>Prospecto: GU's disponibilizadas</h3>
+      <label for="gDias">Dias</label>
+      <input id="gDias" placeholder="ex.: todos">
+      <label for="gDisp">GU's disponibilizadas</label>
+      <input id="gDisp" type="number" min="0">
+      <button id="bGu">Lançar</button><button id="bGuLimpa" class="sec">Limpar dias</button>
+      <div class="dica">A necessidade por dia/operações é calculada sozinha: soma da QTD de GU lançada no mapa em cada dia.</div>
+    </div>
+  </div>
+
+  <div class="lancar" style="margin-top:-2px">
+    <div class="card">
+      <h3>Lançar revista prisional</h3>
+      <label for="rLocal">Local</label>
+      <select id="rLocal"><option value="1">CPANG</option><option value="2">CPVC</option><option value="3">CPBR</option></select>
+      <div class="lin">
+        <div style="flex:2"><label for="rMes">Mês</label><select id="rMes"></select></div>
+        <div style="flex:1"><label for="rDia">Dia</label><input id="rDia" type="number" min="1" max="31"></div>
+      </div>
+      <label>Meses anteriores exibidos no espelho</label>
+      <div id="rChecks" class="checks"></div>
+      <div class="dica">O mês do mapa sempre aparece. Marque aqui os meses anteriores que devem ficar visíveis no quadro.</div>
+      <label for="rSit">Situação</label>
+      <select id="rSit"><option value="PREV">A realizar (só a data)</option><option value="OK">OK</option><option value="NÃO">NÃO</option><option value="EXTRA">OK (extra programação)</option><option value="RED">RED</option></select>
+      <button id="bRev">Lançar</button><button id="bRevLimpa" class="sec">Limpar</button>
+      <div class="dica">Aparece no quadro REVISTAS PRISIONAIS, na linha do mês e na coluna do local.</div>
+    </div>
+
+    <div class="card">
+      <h3>Backup dos dados</h3>
+      <button id="bExp">Exportar tudo (.json)</button>
+      <label for="impArq">Importar arquivo</label>
+      <input id="impArq" type="file" accept=".json,application/json,text/plain">
+      <label for="impTxt">ou cole o conteúdo</label>
+      <textarea id="impTxt" rows="5" style="width:100%;font:11px monospace;padding:6px;border:1px solid #aaa;border-radius:4px" placeholder="Cole aqui o backup exportado ou o resultado de copy(JSON.stringify(localStorage))"></textarea>
+      <button id="bImp">Importar</button>
+      <div class="dica">Traz os meses já lançados de outra versão do arquivo ou de outro navegador. Meses importados substituem os do mesmo mês neste ambiente. Para recuperar dados de uma versão antiga: abra-a, pressione F12, aba Console, rode <b>copy(JSON.stringify(localStorage))</b> e cole aqui.</div>
+      <div id="impMsg" class="dica" role="status"></div>
+    </div>
+  </div>
+
+  </aside>
+  <div id="corpoBox">
+    <div class="corpo" id="corpo">
+      <div class="rolagem" id="mapaBox"></div>
+      <div class="lateral" id="lateral"></div>
+    </div>
+  </div>
+</div>
+
+</div>
+<div id="fmt" role="toolbar" aria-label="Formatação do texto"><button type="button" data-cmd="bold" title="Negrito (Ctrl+B)"><b>N</b></button><button type="button" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button><button type="button" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button><button type="button" data-cmd="insertUnorderedList" title="Lista com marcadores">&#8226; Lista</button><button type="button" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button></div>
+<div id="pop" role="tooltip"></div>
+<div id="conf" role="dialog" aria-live="polite"></div>
+<div id="tvInfo"><span id="tvHora"></span> · <a href="?" id="tvSair">Sair do modo TV</a><span id="tvContaBox" style="display:none"> · <a href="#" id="tvSairConta">Sair da conta</a></span></div>
+<script>
+/* ========= CONFIGURAÇÃO =========
+   Preencha com os dados do seu projeto Supabase (Settings > API).
+   Vazio = modo local (grava só neste navegador, sem login). */
+const SUPABASE_URL = "https://rkuqyjxaiovronokxtkg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrdXF5anhhaW92cm9ub2t4dGtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5Njc3NTYsImV4cCI6MjEwODU0Mzc1Nn0.OA39hQfVAgdfpg3HreudZXP-W8qOZ_3Q3qZ090uKoao";
+/* MAPA COMPARTILHADO PELA EQUIPE: o dono dos dados vem da tabela "acesso" do Supabase
+   (criada pelo arquivo schema_compartilhado.sql), então este campo pode ficar VAZIO.
+   Só preencha (com o User UID do dono) se não quiser usar a tabela acesso. */
+const DONO_COMPARTILHADO = "d2d06889-3d07-409c-a74f-9f0d00d8e337";
+/* ================================= */
+
+const HASH_INICIAL = location.hash || "";   // guarda o que veio no link do e-mail (convite, recuperação, erro)
+/* corrige automaticamente endereços colados com sobras (ex.: .../rest/v1/ ou link do painel) */
+function normalizaUrl(u){
+  u = String(u||"").trim().replace(/^["']|["']$/g,"");
+  if(!u) return "";
+  const painel = u.match(/supabase\.com\/dashboard\/project\/([a-z0-9]{10,})/i);
+  if(painel) return "https://"+painel[1].toLowerCase()+".supabase.co";
+  try{ return new URL(/^https?:\/\//i.test(u) ? u : "https://"+u).origin; }catch(e){ return u; }
+}
+const SB_URL = normalizaUrl(SUPABASE_URL);
+const SB_KEY = String(SUPABASE_KEY||"").replace(/\s+/g,"");
+const sb = (SB_URL && SB_KEY && window.supabase) ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+const $ = id => document.getElementById(id);
+const MESES = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
+const SEM = ["DOM","SEG","TER","QUA","QUI","SEX","SÁB"];
+/* texto formatado (negrito, itálico, sublinhado, listas, parágrafos): só estas marcas são aceitas */
+const TAGS_OK = {B:1,STRONG:1,I:1,EM:1,U:1,BR:1,P:1,DIV:1,UL:1,OL:1,LI:1};
+function limpaHtml(html){
+  const doc = new DOMParser().parseFromString("<body>"+String(html||"")+"</body>","text/html");
+  const out = document.createElement("div");
+  (function copia(src,dst){
+    src.childNodes.forEach(n=>{
+      if(n.nodeType===3){ dst.appendChild(document.createTextNode(n.nodeValue)); }
+      else if(n.nodeType===1){
+        const tag = n.tagName;
+        if(TAGS_OK[tag]){ const el = document.createElement(tag.toLowerCase()); copia(n,el); dst.appendChild(el); }
+        else if(tag!=="SCRIPT" && tag!=="STYLE" && tag!=="TITLE" && tag!=="META"){ copia(n,dst); }   // outra marca: fica só o conteúdo
+      }
+    });
+  })(doc.body,out);
+  return out.innerHTML;
+}
+function htmlCampo(chave){
+  const h = M[chave+"Html"];
+  return (typeof h==="string" && h) ? limpaHtml(h) : esc(M[chave]);       // sem formatação salva: usa o texto puro, mantendo as quebras de linha
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const EVENTOS_PADRAO = [
+  ["PRODUTIVIDADE MENSAL CPE","1","ENVIADA"],["ESCALA MENSAL PROCESSO SEI","1","ENVIADA"],["ESTATÍSTICA MENSAL","5","FECHADA"],
+  ["H. EXTRA ORD. / EXTRAORD.","20","ENVIADA"],["MAPA DIÁRIO DE VTR","OK","DIARIAMENTE"],["MAPA DE EVENTOS","OK","SEMANALMENTE"],
+  ["OP. EXTREMO SUL","1","ININTERRUPTA"],["OPERAÇÃO INTENSIFICAÇÃO","1","EXECUTADA"]
+].map(([nome,v,obs]) => ({nome,v,obs,marcas:{},marcasS:{}}));
+
+let user = null, mes = null, M = null, timer = null, CAT = [], versaoRemota = null;
+const PARAMS = new URLSearchParams(location.search);
+const TV = PARAMS.get("tv")==="1" || location.hash==="#tv";
+let LEITOR = false, semDados = false, compartilhado = false;
+let DONO_ID = String(DONO_COMPARTILHADO||"d2d06889-3d07-409c-a74f-9f0d00d8e337").trim();   // quem é o dono dos dados (UID)                                   // usuário com papel "leitor": só visualiza
+const somenteLeitura = () => TV || LEITOR;
+const donoId = () => DONO_ID || user.id;   // quem é o dono dos dados no banco
+
+function mesAtual(){ const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function diasNoMes(m){ const [a,b] = m.split("-").map(Number); return new Date(a,b,0).getDate(); }
+function diaSemana(m,d){ const [a,b] = m.split("-").map(Number); return new Date(a,b-1,d).getDay(); }
+const ehFds = (m,d) => [0,6].includes(diaSemana(m,d));
+function nomeMes(m,delta=0){ const [a,b]=m.split("-").map(Number); const d=new Date(a,b-1+delta,1); return MESES[d.getMonth()]; }
+
+function modeloVazio(){
+  return {
+    eventos: JSON.parse(JSON.stringify(EVENTOS_PADRAO)),
+    pelotoes:{}, gus:{}, nec:{},
+    revistas:[], revMeses:null, revExtra:{},
+    escDet:["",""], escDem:["",""], opos:["",""],
+    operacoes:"", observacoes:""
+  };
+}
+
+/* ---------- persistência ---------- */
+function chaveLocal(m){ return "mapaop:"+m; }
+async function carregar(m){
+  let d = null;
+  if(sb){
+    const {data,error} = await sb.from("mapas").select("dados,atualizado").eq("user_id",donoId()).eq("mes",m).maybeSingle();
+    if(error){ $("estado").textContent = "Erro ao carregar: "+error.message; }
+    d = data && data.dados;
+    versaoRemota = (data && data.atualizado) ? new Date(data.atualizado).getTime() : null;
+    semDados = !d;
+  } else {
+    const t = localStorage.getItem(chaveLocal(m)); d = t ? JSON.parse(t) : null;
+  }
+  if(!d){
+    // herda as linhas (nomes, valores, situação) do mês anterior mais recente salvo
+    d = modeloVazio();
+    const [a,b]=m.split("-").map(Number); const ant=new Date(a,b-2,1);
+    const mAnt = ant.getFullYear()+"-"+String(ant.getMonth()+1).padStart(2,"0");
+    let dAnt=null;
+    if(sb){ const r = await sb.from("mapas").select("dados").eq("user_id",donoId()).eq("mes",mAnt).maybeSingle(); dAnt=r.data&&r.data.dados; }
+    else { const t=localStorage.getItem(chaveLocal(mAnt)); dAnt=t?JSON.parse(t):null; }
+    if(dAnt){
+      d.eventos = dAnt.eventos.map(e=>({nome:e.nome,v:e.v,obs:e.obs,marcas:{},marcasS:{}}));
+      d.revistas = dAnt.revistas||d.revistas;
+      d.revMeses = Array.isArray(dAnt.revMeses) ? dAnt.revMeses.slice() : null;
+      d.revExtra = Object.assign({}, dAnt.revExtra||{});
+    }
+  }
+  normalizar(d);
+  M = d;
+  garantirNoCat();
+}
+function normalizar(d){
+  if(!Array.isArray(d.eventos)) d.eventos = [];
+  d.eventos.forEach(e=>{
+    if(!e.marcas || typeof e.marcas!=="object") e.marcas = {}; if(e.obs==null) e.obs=""; if(e.v==null) e.v="1";
+    if(!e.marcasS || typeof e.marcasS!=="object") e.marcasS = {};
+    // dados antigos: cada dia já lançado guarda a situação que a linha tinha
+    Object.keys(e.marcas).forEach(k=>{ if(e.marcasS[k]===undefined) e.marcasS[k] = e.obs; });
+  });
+  ["pelotoes","gus","nec","revExtra"].forEach(k=>{ if(!d[k] || typeof d[k]!=="object" || Array.isArray(d[k])) d[k] = {}; });
+  if(!Array.isArray(d.revistas)) d.revistas = [];
+  d.revistas = d.revistas.map(r=>Array.isArray(r)?[r[0]||"",r[1]||"",r[2]||"",r[3]||""]:["","","",""]);
+  ["escDet","escDem","opos"].forEach(k=>{ if(!Array.isArray(d[k])) d[k]=["",""]; while(d[k].length<2) d[k].push(""); });
+  if(typeof d.operacoes!=="string") d.operacoes = "";
+  if(typeof d.observacoes!=="string") d.observacoes = "";
+  if(!Array.isArray(d.revMeses)) d.revMeses = null;
+  return d;
+}
+async function carregarCat(){
+  let d = null;
+  if(sb){
+    const {data} = await sb.from("mapas").select("dados").eq("user_id",donoId()).eq("mes","catalogo").maybeSingle();
+    d = data && data.dados;
+  } else {
+    const t = localStorage.getItem("mapaop:catalogo"); d = t ? JSON.parse(t) : null;
+  }
+  CAT = (d && Array.isArray(d.eventos)) ? d.eventos : EVENTOS_PADRAO.map(e=>e.nome);
+}
+function salvarCat(){
+  const dados = {eventos:CAT};
+  if(sb) sb.from("mapas").upsert({user_id:donoId(),mes:"catalogo",dados,atualizado:new Date().toISOString()}).select("mes").then(r=>{ const err = r.error || ((r.data||[]).length ? null : new Error("o servidor não confirmou a gravação")); if(err) $("estado").textContent="Erro: "+err.message; }, e=>{ $("estado").textContent="Erro: "+((e&&e.message)||"sem conexão"); });
+  else localStorage.setItem("mapaop:catalogo",JSON.stringify(dados));
+}
+function garantirNoCat(){
+  let mudou=false;
+  M.eventos.forEach(e=>{ if(!CAT.includes(e.nome)){ CAT.push(e.nome); mudou=true; } });
+  if(mudou) salvarCat();
+}
+let salvando = false;
+function salvarAgora(){
+  timer = null;                      // nenhuma edição pendente a partir daqui
+  salvando = true;
+  $("estado").textContent = "Salvando…";
+  const m = mes, dados = M;
+  const fim = e => {
+    salvando = false;
+    $("estado").textContent = !e ? "Salvo"
+      : (/row-level security|violates|permission denied/i.test(e.message||"") ? "SEM PERMISSÃO para gravar: confira seu papel (editor) na tabela acesso e o DONO_COMPARTILHADO" : "Erro: "+e.message);
+  };
+  if(sb){
+    const ts = new Date();
+    sb.from("mapas").upsert({user_id:donoId(),mes:m,dados,atualizado:ts.toISOString()}).select("mes").then(r=>{ const err = r.error || ((r.data||[]).length ? null : new Error("o servidor não confirmou a gravação (verifique as permissões da tabela mapas)")); if(!err && m===mes) versaoRemota = ts.getTime(); fim(err); }, e=>fim(e||new Error("sem conexão")));
+  } else {
+    try{ localStorage.setItem(chaveLocal(m),JSON.stringify(dados)); fim(null); }catch(e){ fim(e); }
+  }
+}
+function salvar(){ clearTimeout(timer); $("estado").textContent="Alterado…"; timer=setTimeout(salvarAgora,600); }
+
+/* ---------- utilitários ---------- */
+function parseDias(s,n){
+  s = (s||"").trim().toLowerCase();
+  if(!s) return [];
+  if(s==="todos"||s==="todo"||s==="*") return Array.from({length:n},(_,i)=>i+1);
+  const out = new Set();
+  s.split(/[,;\s]+/).filter(Boolean).forEach(p=>{
+    const r = p.match(/^(\d+)-(\d+)$/);
+    if(r){ for(let i=+r[1];i<=+r[2];i++) if(i>=1&&i<=n) out.add(i); }
+    else if(/^\d+$/.test(p) && +p>=1 && +p<=n) out.add(+p);
+  });
+  return [...out].sort((a,b)=>a-b);
+}
+
+/* ---------- renderização ---------- */
+const CORES = {"EXECUTADA":"#1f9d3a","AGU. EXECUÇÃO":"#e08a00","NO PRAZO":"#1d6fe0","REDESIGNADO":"#7a3fb0","ENVIADA":"#0f8b8d","FECHADA":"#666666","PENDENTE":"#c0392b"};
+const corCelula = t => CORES[(t||"").trim().toUpperCase()] || "#e00000";   // sem situação conhecida = vermelho do espelho original
+const corStatus = t => CORES[(t||"").trim().toUpperCase()] || "#4d3f34";
+/* situações que ainda aguardam a execução (ajuste aqui se precisar incluir outras) */
+const STATUS_A_EXECUTAR = ["AGU. EXECUÇÃO","PENDENTE"];
+const aguardando = st => STATUS_A_EXECUTAR.includes(String(st||"").trim().toUpperCase());
+/* data de referência: hoje (ou ?hoje=AAAA-MM-DD para simular/testar) */
+function hojeData(){
+  const p = PARAMS.get("hoje");
+  if(p && /^\d{4}-\d{2}-\d{2}$/.test(p)){ const [a,b,c] = p.split("-").map(Number); return new Date(a,b-1,c); }
+  const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+const serialYMD = (y,m,d) => Math.floor(Date.UTC(y,m-1,d)/86400000);
+function diasAte(y,m,d){ const h = hojeData(); return serialYMD(y,m,d) - serialYMD(h.getFullYear(), h.getMonth()+1, h.getDate()); }  // 0 = hoje, 1 = amanhã, <0 = passou
+function classeAlerta(st,y,m,d){
+  if(!aguardando(st)) return "";
+  const dif = diasAte(y,m,d);
+  return dif===1 ? "al-d1" : (dif<=0 ? "al-conf" : "");
+}
+function anoDaRevista(label){
+  const [a,b] = mes.split("-").map(Number), cur = b-1, i = MES3.indexOf((label||"").trim().toUpperCase());
+  if(i<0) return null;
+  return {ano: (i>cur && i-cur>6) ? a-1 : a, mes: i+1};
+}
+function classeAlertaRevista(label,t){
+  if(!/^\d{1,2}$/.test(t)) return "";                    // só revistas ainda "a realizar" (apenas a data)
+  const r = anoDaRevista(label); if(!r) return "";
+  const dia = parseInt(t,10); if(!(dia>=1 && dia<=31)) return "";
+  const dif = diasAte(r.ano, r.mes, dia);
+  return dif===1 ? "al-d1" : (dif<=0 ? "al-conf" : "");
+}
+const SIGLAS = {"EXECUTADA":"EXE","AGU. EXECUÇÃO":"AGU","NO PRAZO":"PRZ","REDESIGNADO":"RED","ENVIADA":"ENV","FECHADA":"FEC","PENDENTE":"PEN","DIARIAMENTE":"DIA","SEMANALMENTE":"SEM","ININTERRUPTA":"ININ"};
+const sigla = t => SIGLAS[(t||"").trim().toUpperCase()] || (t||"").trim().toUpperCase().replace(/[^A-ZÀ-Ú0-9]/g,"").slice(0,3);
+function statusDia(e,d){ return String((e.marcasS||{})[d] ?? e.obs ?? "").trim(); }
+function resumoStatus(e){
+  const dias = Object.keys(e.marcas).map(Number).sort((a,b)=>a-b);
+  const lista = [];
+  dias.forEach(d=>{ const st = statusDia(e,d); if(st && !lista.includes(st)) lista.push(st); });
+  return {dias, lista};
+}
+function necDia(d){
+  let t = 0;
+  M.eventos.forEach(e=>{ const v = parseFloat(String(e.marcas[d]??"").replace(",",".")); if(!isNaN(v)) t += v; });
+  return Math.round(t*100)/100;
+}
+function contaMarcas(filtro){
+  let t = 0;
+  M.eventos.forEach(e=>{ if(filtro(e.nome)) t += Object.keys(e.marcas).length; });
+  return t;
+}
+const ehDiversas = n => /escolta\s+diversas/i.test(n);
+// detentos = ESCOLTA, exceto ESCOLTA DIVERSAS (que vai em "demais escoltas")
+function totalEscoltas(){ return contaMarcas(n => /escolta/i.test(n) && !ehDiversas(n)); }
+function totalDiversas(){ return contaMarcas(ehDiversas); }
+function totalOpos(){ return contaMarcas(n => /\bopos?\b/i.test(n)); }
+function mesesRevVisiveis(){
+  const cur = +mes.split("-")[1] - 1;
+  if(!Array.isArray(M.revMeses)){
+    const padrao = []; for(let k=4;k>=1;k--) padrao.push(MES3[(cur-k+12)%12]);
+    const comDados = (M.revistas||[]).filter(r=>[1,2,3].some(c=>(r[c]||"").trim())).map(r=>(r[0]||"").trim().toUpperCase());
+    M.revMeses = [...new Set([...padrao, ...comDados])].filter(m=>MES3.includes(m) && m!==MES3[cur]);
+  }
+  const chave = m => { const i = MES3.indexOf(m); return (i>cur && i-cur>6) ? i-12 : i; };  // até 6 meses à frente = futuro do mesmo ano; além disso = ano anterior
+  return [...new Set([...M.revMeses, MES3[cur]])].filter(m=>MES3.includes(m)).sort((x,y)=>chave(x)-chave(y));
+}
+function rowsRevistas(){
+  return mesesRevVisiveis().map(m=>{
+    let ri = M.revistas.findIndex(r=>(r[0]||"").trim().toUpperCase()===m);
+    if(ri<0){ M.revistas.push([m,"","",""]); ri = M.revistas.length-1; }
+    return {r:M.revistas[ri], ri};
+  });
+}
+function montaChecks(){
+  mesesRevVisiveis();
+  const cur = +mes.split("-")[1] - 1;
+  $("rChecks").innerHTML = MES3.map((m,i)=>`<label><input type="checkbox" data-rm="${m}" ${i===cur?"checked disabled":(M.revMeses.includes(m)?"checked":"")}> ${m}</label>`).join("");
+}
+function atualizaPlaceholders(){
+  const e = M.eventos.find(x=>x.nome===$("fEv").value) || {};
+  $("fVal").placeholder = "vazio = só pinta";
+  $("fObs").placeholder = e.obs || "EXECUTADA";
+}
+function render(){
+  const n = diasNoMes(mes), [ano] = mes.split("-");
+  const nm = nomeMes(mes);
+  const cab = (cls) => Array.from({length:n},(_,i)=>{ const d=i+1; return `<th class="${cls}${ehFds(mes,d)?" fds":""}">${cls==="dia"?d:SEM[diaSemana(mes,d)]}</th>`; }).join("");
+  const cols = `<colgroup><col style="width:250px">${"<col>".repeat(n)}<col style="width:100px"></colgroup>`;
+  const fim = `<td class="nm" style="border:0"></td>`;
+  const largT = 250 + 100 + n*28;
+  let h = `<table class="mapa" style="width:${largT}px">${cols}<thead>
+    <tr><th class="titulo" colspan="${n+2}">MAPA DE ACOMPANHAMENTO OPERACIONAL</th></tr>
+    <tr><th class="mes" colspan="${n+2}">${nm} DE ${ano}</th></tr>
+    <tr><th class="ev" rowspan="2">EVENTO / DATA</th>${cab("dia")}<th class="obs" rowspan="2">OBS</th></tr>
+    <tr>${cab("sem")}</tr></thead><tbody>`;
+  M.eventos.forEach((e,i)=>{
+    const rs = resumoStatus(e), multi = rs.lista.length > 1;
+    h += `<tr><td class="nome">${esc(e.nome)}<span class="x" data-del="${i}" title="Remover linha">×</span></td>`;
+    for(let d=1; d<=n; d++){
+      const v = e.marcas[d], st = v!==undefined ? statusDia(e,d) : "";
+      const al = v!==undefined ? classeAlerta(st, +ano, +mes.split("-")[1], d) : "";
+      const aviso = al==="al-d1" ? " — AMANHÃ: execução prevista" : al==="al-conf" ? " — clique para confirmar a execução" : "";
+      const extra = v!==undefined ? ` title="Dia ${d}${st?" — "+esc(st):""}${aviso}" style="background:${corCelula(st)}"${multi && st ? ` data-s="${esc(sigla(st))}"` : ""}` : "";
+      h += `<td class="c${ehFds(mes,d)?" fds":""}${v!==undefined?" mk":""}${al?" "+al:""}" data-i="${i}" data-d="${d}"${extra}>${v!==undefined?esc(v):""}</td>`;
+    }
+    const pop = rs.dias.length ? ` data-pop="${i}"` : "";
+    if(multi){
+      const chips = rs.lista.map(t=>`<span class="chip" style="background:${corStatus(t)}">${esc(sigla(t))}</span>`).join("");
+      h += `<td class="o multi"${pop}>${chips}</td></tr>`;
+    } else {
+      h += `<td class="o" contenteditable="true" data-obs="${i}"${pop}>${esc(rs.dias.length ? rs.lista[0] ?? e.obs : e.obs)}</td></tr>`;
+    }
+  });
+  h += `</tbody></table>`;
+
+  // prospecto
+  const cabP = cls => Array.from({length:n},(_,i)=>{ const d=i+1; return `<th class="${cls}${ehFds(mes,d)?" fds":""}">${cls==="d"?d:SEM[diaSemana(mes,d)]}</th>`; }).join("");
+  h += `<table class="pros" style="width:${largT}px">${cols}<caption>PROSPECTO ${nm} ${ano}</caption>
+    <thead><tr><td class="nm" style="border:0"></td>${cabP("d")}${fim}</tr><tr><td class="nm" style="border:0"></td>${cabP("sem")}${fim}</tr></thead><tbody>`;
+  for(let p=1;p<=4;p++){
+    h += `<tr><td class="nm">${p}º PELOTÃO</td>`;
+    for(let d=1;d<=n;d++){
+      const c = getCiclos(d);
+      if(c.u===p) h += `<td class="p${p}" title="Ciclo único">${p}º</td>`;
+      else if(c.c1===p || c.c2===p){
+        const a = c.c1===p, b = c.c2===p;
+        const marca = (a?"¹":"")+(b?"²":""), nome = a&&b ? "1º e 2º Ciclo" : a ? "1º Ciclo" : "2º Ciclo";
+        h += `<td class="p${p}" title="${nome}">${p}º<sup class="ci">${marca}</sup></td>`;
+      } else h += `<td${ehFds(mes,d)?' class="fds"':''}></td>`;
+    }
+    h += fim + `</tr>`;
+  }
+  h += `<tr class="disp"><td class="nm">GU'S POR DIA DISPONIBILIZADAS</td>`;
+  for(let d=1;d<=n;d++) h += `<td class="gu ed" contenteditable="true" inputmode="numeric" data-gu="${d}" title="Clique e digite a quantidade disponibilizada">${esc(M.gus[d]??"")}</td>`;
+  h += fim + `</tr><tr class="nec"><td class="nm">NECESSIDADE DE GU'S POR DIA/OPERAÇÕES</td>`;
+  for(let d=1;d<=n;d++){
+    const t = necDia(d), disp = +(M.gus[d] ?? 0);
+    h += `<td class="gu${t>disp?" alerta":""}" data-nec="${d}"${t>disp?` title="Necessidade (${t}) maior que as GU's disponibilizadas (${disp})"`:""}>${t?t:""}</td>`;
+  }
+  h += fim + `</tr></tbody></table>
+    <div class="obsbox"><b>OBSERVAÇÕES</b><div class="rt" contenteditable="true" data-txt="observacoes">${htmlCampo("observacoes")}</div></div>`;
+  $("mapaBox").innerHTML = h;
+
+  // lateral
+  const ant = nomeMes(mes,-1), atu = nm;
+  const cnt = (titulo,chave,auto) => `<table><tr><th class="t" colspan="3">${titulo}</th></tr>
+    <tr><td><b>MÊS</b></td><td><b>${ant}</b></td><td><b>${atu}</b></td></tr>
+    <tr><td><b>QTD:</b></td><td contenteditable="true" data-cnt="${chave},0">${esc(M[chave][0])}</td>${auto!==undefined
+      ? `<td class="auto" title="Soma automática dos dias lançados nos eventos correspondentes">${auto}</td>`
+      : `<td contenteditable="true" data-cnt="${chave},1">${esc(M[chave][1])}</td>`}</tr></table>`;
+  let l = `<table><tr><th class="t r" colspan="4">REVISTAS PRISIONAIS ${ano}</th></tr>
+    <tr><td></td><td><b>CPANG</b></td><td><b>CPVC</b></td><td><b>CPBR</b></td></tr>`;
+  rowsRevistas().forEach(({r,ri})=>{
+    l += `<tr><td contenteditable="true" data-rev="${ri},0"><b>${esc(r[0])}</b></td>` +
+      [1,2,3].map(c=>{
+        const t = (r[c]||"").trim();
+        const cls = !t ? "" : /^\d{1,2}$/.test(t) ? "rv-prev" : /N[ÃA]O/i.test(t) ? "rv-nao" : /\/RED$/i.test(t) ? "rv-red" : (M.revExtra && M.revExtra[(r[0]||"").trim().toUpperCase()+","+c]) ? "rv-ext" : "rv-ok";
+        const al = classeAlertaRevista(r[0], t);
+        const tit = al==="al-d1" ? ' title="AMANHÃ: revista prevista"' : al==="al-conf" ? ' title="Clique para confirmar a revista"' : "";
+        return `<td class="${cls}${al?" "+al:""}" contenteditable="true" data-rev="${ri},${c}"${tit}>${esc(r[c])}</td>`;
+      }).join("") + `</tr>`;
+  });
+  l += `</table>`;
+  l += cnt("ESCOLTAS DETENTOS "+atu,"escDet",totalEscoltas()) + cnt("DEMAIS ESCOLTAS "+atu,"escDem",totalDiversas()) + cnt("OPO'S "+atu,"opos",totalOpos());
+  l += `<div class="opx"><div class="th">OPERAÇÕES EM EXECUÇÃO</div><div class="ed rt" contenteditable="true" data-txt="operacoes">${htmlCampo("operacoes")}</div></div>`;
+  $("lateral").innerHTML = l;
+
+  // seletor de eventos
+  const sel = $("fEv"), atual = sel.value;
+  sel.innerHTML = CAT.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  if(atual && CAT.includes(atual)) sel.value = atual;
+  atualizaPlaceholders();
+  montaChecks();
+  if(somenteLeitura()) document.querySelectorAll("[contenteditable]").forEach(x=>x.removeAttribute("contenteditable"));
+  { const h = hojeData(); diaRenderizado = h.getFullYear()+"-"+h.getMonth()+"-"+h.getDate(); }
+  if(confAlvo && !alvoAindaPendente(confAlvo)){ confAlvo = null; $("conf").style.display = "none"; }
+  ajustar();
+  setTimeout(verificarPendencias, 500);
+}
+
+/* ---------- ações ---------- */
+function lancarEvento(limpar){
+  const nome = $("fEv").value; if(!nome){ alert("Cadastre um evento em \"Novo evento\"."); return; }
+  let e = M.eventos.find(x=>x.nome===nome);
+  if(!e){ if(limpar) return; e = {nome, v:"1", obs:"EXECUTADA", marcas:{}, marcasS:{}}; M.eventos.push(e); }
+  if(!e.marcasS) e.marcasS = {};
+  const dias = parseDias($("fDias").value, diasNoMes(mes));
+  if(!dias.length){ alert("Informe os dias. Ex.: 5, 12-15, todos"); return; }
+  const v = $("fVal").value.trim();
+  const st = $("fObs").value.trim();
+  dias.forEach(d=>{
+    if(limpar){ delete e.marcas[d]; delete e.marcasS[d]; }
+    else { const atual = statusDia(e,d); e.marcas[d] = v; e.marcasS[d] = st || atual || e.obs || ""; }   // a situação vale só para o dia lançado
+  });
+  if(!limpar && st) e.obs = st;
+  $("fDias").value=""; $("fVal").value=""; $("fObs").value="";
+  render(); salvar();
+}
+function novoEvento(){
+  const nome = $("nNome").value.trim().toUpperCase(); if(!nome){ alert("Informe o nome."); return; }
+  if(CAT.includes(nome)){ alert("Esse evento já está no banco."); $("fEv").value = nome; return; }
+  CAT.push(nome); salvarCat();
+  $("nNome").value="";
+  render(); $("fEv").value = nome; atualizaPlaceholders();
+}
+function getCiclos(d){
+  const v = M.pelotoes[d];
+  if(v==null) return {};
+  if(typeof v==="number") return {u:v};   // dados antigos = ciclo único
+  return v;
+}
+function lancarPelotao(limpar){
+  const dias = parseDias($("pDias").value, diasNoMes(mes));
+  if(!dias.length){ alert("Informe os dias."); return; }
+  const p = +$("pPel").value;
+  const ciclo = $("pCiclo").value;  // u | c1 | c2
+  dias.forEach(d=>{
+    const c = Object.assign({}, getCiclos(d));
+    if(limpar){ if(c[ciclo]===p) delete c[ciclo]; }
+    else if(ciclo==="u"){ for(const k of Object.keys(c)) delete c[k]; c.u = p; }   // único substitui os dois ciclos
+    else { delete c.u; c[ciclo] = p; }                                              // ciclo substitui o único e o outro pelotão do mesmo ciclo
+    if(Object.keys(c).length) M.pelotoes[d] = c; else delete M.pelotoes[d];
+  });
+  $("pDias").value=""; render(); salvar();
+}
+const MES3 = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+$("rMes").innerHTML = MESES.map((n,i)=>`<option value="${MES3[i]}">${n}</option>`).join("");
+function lancarRevista(limpar){
+  const c = +$("rLocal").value, m = $("rMes").value, sit = $("rSit").value;
+  const dia = parseInt($("rDia").value,10);
+  if(!limpar && !(dia>=1 && dia<=31)){ alert("Informe o dia (1 a 31)."); return; }
+  M.revExtra = M.revExtra || {};
+  mesesRevVisiveis();
+  if(!limpar && !M.revMeses.includes(m) && m!==MES3[+mes.split("-")[1]-1]) M.revMeses.push(m);
+  let ri = M.revistas.findIndex(r=>(r[0]||"").trim().toUpperCase()===m);
+  if(ri<0){
+    if(limpar) return;
+    M.revistas.push([m,"","",""]);
+    M.revistas.sort((a,b)=>MES3.indexOf((a[0]||"").trim().toUpperCase())-MES3.indexOf((b[0]||"").trim().toUpperCase()));
+    ri = M.revistas.findIndex(r=>(r[0]||"").trim().toUpperCase()===m);
+  }
+  const chave = m+","+c;
+  if(limpar){ M.revistas[ri][c] = ""; delete M.revExtra[chave]; }
+  else {
+    M.revistas[ri][c] = String(dia).padStart(2,"0") + (sit==="PREV" ? "" : "/"+(sit==="NÃO"?"NÃO":sit==="RED"?"RED":"OK"));
+    if(sit==="EXTRA") M.revExtra[chave]=true; else delete M.revExtra[chave];
+  }
+  $("rDia").value=""; render(); salvar();
+}
+function lancarGu(limpar){
+  const dias = parseDias($("gDias").value, diasNoMes(mes));
+  if(!dias.length){ alert("Informe os dias."); return; }
+  const a=$("gDisp").value;
+  if(limpar){ dias.forEach(d=>delete M.gus[d]); }
+  else {
+    if(a===""){ alert("Informe a quantidade disponibilizada."); return; }
+    dias.forEach(d=>{ M.gus[d]=+a; });
+  }
+  $("gDias").value=""; $("gDisp").value=""; render(); salvar();
+}
+
+/* eventos delegados */
+$("mapaBox").addEventListener("click", ev=>{
+  if(somenteLeitura()) return;
+  const del = ev.target.closest("[data-del]");
+  if(del){ const i=+del.dataset.del; if(confirm("Remover a linha \""+M.eventos[i].nome+"\"?")){ M.eventos.splice(i,1); render(); salvar(); } return; }
+  const c = ev.target.closest("td.c"); if(!c || c.classList.contains("fora")) return;
+  if(c.classList.contains("al-conf")){ abrirConf({tipo:"ev", i:+c.dataset.i, d:+c.dataset.d}, c); return; }
+  const e = M.eventos[+c.dataset.i], d = c.dataset.d;
+  if(!e.marcasS) e.marcasS = {};
+  if(e.marcas[d]!==undefined){ delete e.marcas[d]; delete e.marcasS[d]; } else { e.marcas[d] = ""; e.marcasS[d] = e.obs || ""; }
+  render(); salvar();
+});
+function atualizaNec(){
+  document.querySelectorAll("[data-nec]").forEach(td=>{
+    const d = +td.dataset.nec, t = necDia(d), disp = +(M.gus[d] ?? 0);
+    td.textContent = t ? t : "";
+    td.classList.toggle("alerta", t>disp);
+    if(t>disp) td.title = "Necessidade ("+t+") maior que as GU's disponibilizadas ("+disp+")"; else td.removeAttribute("title");
+  });
+}
+function lerEditavel(ev){
+  const t = ev.target;
+  if(t.dataset && t.dataset.gu){
+    const d = +t.dataset.gu, txt = t.textContent.trim().replace(",",".");
+    if(txt===""){ delete M.gus[d]; }
+    else if(!isNaN(+txt) && +txt>=0){ M.gus[d] = +txt; }
+    t.textContent = M.gus[d] ?? "";
+    atualizaNec(); salvar(); return;
+  }
+  if(t.dataset.obs!==undefined){
+    const ev = M.eventos[+t.dataset.obs], txt = t.textContent.trim();
+    ev.obs = txt; if(!ev.marcasS) ev.marcasS = {};
+    Object.keys(ev.marcas).forEach(k=>{ ev.marcasS[k] = txt; });
+  }
+  else if(t.dataset.txt){ M[t.dataset.txt] = t.innerText.trim(); M[t.dataset.txt+"Html"] = limpaHtml(t.innerHTML); }
+  else if(t.dataset.cnt){ const [k,j]=t.dataset.cnt.split(","); M[k][+j]=t.textContent.trim(); }
+  else if(t.dataset.rev){ const [r,c]=t.dataset.rev.split(",").map(Number); M.revistas[r][c]=t.textContent.trim(); }
+  else return;
+  salvar();
+}
+$("mapaBox").addEventListener("focusout", lerEditavel);
+$("mapaBox").addEventListener("keydown", ev=>{
+  if(ev.key==="Enter" && ev.target.dataset && ev.target.dataset.gu){ ev.preventDefault(); ev.target.blur(); }
+});
+$("lateral").addEventListener("focusout", lerEditavel);
+$("lateral").addEventListener("click", ev=>{
+  if(somenteLeitura()) return;
+  const td = ev.target.closest && ev.target.closest("td.al-conf[data-rev]");
+  if(!td) return;
+  const [ri,c] = td.dataset.rev.split(",").map(Number);
+  abrirConf({tipo:"rev", ri, c}, td);
+});
+
+$("bEv").onclick = ()=>lancarEvento(false);
+$("bEvLimpa").onclick = ()=>lancarEvento(true);
+$("bNovo").onclick = novoEvento;
+$("bEvDel").onclick = ()=>{
+  const n = $("fEv").value; if(!n) return;
+  if(!confirm("Remover \""+n+"\" do banco de eventos? As linhas já lançadas nos meses permanecem.")) return;
+  CAT = CAT.filter(x=>x!==n); salvarCat(); render();
+};
+$("bPel").onclick = ()=>lancarPelotao(false);
+$("bPelLimpa").onclick = ()=>lancarPelotao(true);
+$("bGu").onclick = ()=>lancarGu(false);
+$("rChecks").addEventListener("change", ev=>{
+  const m = ev.target.dataset && ev.target.dataset.rm; if(!m) return;
+  mesesRevVisiveis();
+  if(ev.target.checked){ if(!M.revMeses.includes(m)) M.revMeses.push(m); }
+  else M.revMeses = M.revMeses.filter(x=>x!==m);
+  render(); salvar();
+});
+$("bRev").onclick = ()=>lancarRevista(false);
+$("bRevLimpa").onclick = ()=>lancarRevista(true);
+$("bGuLimpa").onclick = ()=>lancarGu(true);
+
+/* ---------- confirmação de execução (dia do evento chegou) ---------- */
+let confAlvo = null;
+const SNOOZE_MIN = 30;
+function chaveAlvo(a){
+  if(a.tipo==="ev"){ const e = M.eventos[a.i]; return "ev|"+mes+"|"+(e?e.nome:a.i)+"|"+a.d; }
+  const r = M.revistas[a.ri]; return "rev|"+mes+"|"+(r?r[0]:a.ri)+"|"+a.c;
+}
+function lerSnooze(){ try{ return JSON.parse(sessionStorage.getItem("mapaop:snooze")||"{}"); }catch(e){ return {}; } }
+function adiar(a){ try{ const z = lerSnooze(); z[chaveAlvo(a)] = Date.now() + SNOOZE_MIN*60000; sessionStorage.setItem("mapaop:snooze", JSON.stringify(z)); }catch(e){} }
+function adiado(a){ const t = lerSnooze()[chaveAlvo(a)]; return !!t && t > Date.now(); }
+function alvoAindaPendente(a){
+  if(!a) return false;
+  const [ano,mm] = mes.split("-").map(Number);
+  if(a.tipo==="ev"){ const e = M.eventos[a.i]; if(!e || e.marcas[a.d]===undefined) return false; return classeAlerta(statusDia(e,a.d), ano, mm, a.d)==="al-conf"; }
+  const r = M.revistas[a.ri]; if(!r) return false; return classeAlertaRevista(r[0], (r[a.c]||"").trim())==="al-conf";
+}
+function pendencias(){
+  const out = [], [ano,mm] = mes.split("-").map(Number);
+  M.eventos.forEach((e,i)=>{ Object.keys(e.marcas).map(Number).sort((x,y)=>x-y).forEach(d=>{
+    if(classeAlerta(statusDia(e,d), ano, mm, d)==="al-conf") out.push({tipo:"ev", i, d});
+  }); });
+  rowsRevistas().forEach(({r,ri})=>{ [1,2,3].forEach(c=>{
+    if(classeAlertaRevista(r[0], (r[c]||"").trim())==="al-conf") out.push({tipo:"rev", ri, c});
+  }); });
+  return out;
+}
+const NOMES_LOCAL = ["","CPANG","CPVC","CPBR"];
+function posicionaConf(ancora){
+  const p = $("conf"); p.style.display = "block";
+  const r = ancora.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  let left = r.left + r.width/2 - w/2; left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  let top = r.bottom + 8; if(top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 8);
+  p.style.left = left+"px"; p.style.top = top+"px";
+}
+function fecharConf(adia){
+  if(adia && confAlvo) adiar(confAlvo);
+  confAlvo = null; $("conf").style.display = "none";
+}
+function abrirConf(a, ancora){
+  confAlvo = a; esconderPop();
+  const p = $("conf"), [ano,mm] = mes.split("-").map(Number);
+  if(a.tipo==="ev"){
+    const e = M.eventos[a.i], st = statusDia(e,a.d), dd = String(a.d).padStart(2,"0")+"/"+String(mm).padStart(2,"0");
+    p.innerHTML = `<div class="ct">Confirmar execução</div><div class="cb"><p><b>${esc(e.nome)}</b><br>Dia ${dd} · situação atual: ${esc(st)}</p><p>A execução foi realizada?</p>
+      <button class="ok" data-ac="exec">✔ Sim, executada</button>
+      <button class="re" data-ac="redes">↻ Redesignar para outro dia</button>
+      <div id="confRed" style="display:none"><label for="confDia">Novo dia (1 a ${diasNoMes(mes)})</label><div class="lin"><input id="confDia" type="number" min="1" max="${diasNoMes(mes)}"><button class="re" data-ac="redesOk" style="width:auto">Confirmar</button></div></div>
+      <button class="dep" data-ac="depois">Lembrar mais tarde</button></div>`;
+  } else {
+    const r = M.revistas[a.ri], t = (r[a.c]||"").trim(), info = anoDaRevista(r[0]);
+    const dd = String(parseInt(t,10)).padStart(2,"0")+"/"+String(info?info.mes:0).padStart(2,"0");
+    p.innerHTML = `<div class="ct">Confirmar revista prisional</div><div class="cb"><p><b>${NOMES_LOCAL[a.c]}</b> · dia ${dd}</p><p>A revista foi realizada?</p>
+      <button class="ok" data-ac="rOK">✔ Realizada (OK)</button>
+      <button class="no" data-ac="rNAO">✖ Não realizada (NÃO)</button>
+      <button class="red" data-ac="rRED">RED</button>
+      <button class="dep" data-ac="depois">Lembrar mais tarde</button></div>`;
+  }
+  posicionaConf(ancora);
+}
+$("conf").addEventListener("click", ev=>{
+  const b = ev.target.closest("button[data-ac]"); if(!b || !confAlvo) return;
+  const ac = b.dataset.ac, a = confAlvo;
+  if(ac==="depois"){ fecharConf(true); return; }
+  if(ac==="redes"){ const box = $("confRed"); box.style.display = "block"; $("confDia").focus(); return; }
+  if(a.tipo==="ev"){
+    const e = M.eventos[a.i]; if(!e){ fecharConf(false); return; }
+    if(!e.marcasS) e.marcasS = {};
+    if(ac==="exec"){ e.marcasS[a.d] = "EXECUTADA"; }
+    else if(ac==="redesOk"){
+      const nd = parseInt($("confDia").value,10), n = diasNoMes(mes);
+      if(!(nd>=1 && nd<=n) || nd===a.d){ $("confDia").focus(); return; }
+      const q = e.marcas[a.d];
+      e.marcas[a.d] = ""; e.marcasS[a.d] = "REDESIGNADO";          // o dia original fica como REDESIGNADO, sem QTD
+      e.marcas[nd] = (e.marcas[nd]!==undefined && String(e.marcas[nd]).trim()) ? e.marcas[nd] : q;
+      e.marcasS[nd] = "AGU. EXECUÇÃO";                             // o novo dia passa a aguardar execução
+    }
+  } else {
+    const r = M.revistas[a.ri]; if(!r){ fecharConf(false); return; }
+    const dia = String(parseInt(r[a.c],10)).padStart(2,"0");
+    const rotulo = (r[0]||"").trim().toUpperCase(), chave = rotulo+","+a.c;
+    M.revExtra = M.revExtra || {};
+    if(ac==="rOK"){ r[a.c] = dia+"/OK"; }
+    else if(ac==="rNAO"){ r[a.c] = dia+"/NÃO"; }
+    else if(ac==="rRED"){ r[a.c] = dia+"/RED"; }
+    delete M.revExtra[chave];
+  }
+  confAlvo = null; $("conf").style.display = "none";
+  render(); salvar();
+});
+document.addEventListener("keydown", ev=>{ if(ev.key==="Escape" && confAlvo) fecharConf(true); });
+document.addEventListener("mousedown", ev=>{
+  if(confAlvo && !ev.target.closest("#conf") && !ev.target.closest(".al-conf")) fecharConf(true);
+});
+/* abre sozinho o submenu quando há execução a confirmar (um de cada vez) */
+function verificarPendencias(){
+  if(somenteLeitura() || !user || !M || confAlvo || document.hidden) return;
+  const a0 = document.activeElement;
+  if(a0 && (a0.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a0.tagName))) return;   // não interromper quem digita
+  if(timer || salvando) return;
+  const lista = pendencias().filter(a=>!adiado(a));
+  if(!lista.length) return;
+  const a = lista[0];
+  const ancora = a.tipo==="ev" ? document.querySelector('.mapa td.c[data-i="'+a.i+'"][data-d="'+a.d+'"]') : document.querySelector('.lateral td[data-rev="'+a.ri+','+a.c+'"]');
+  if(ancora) abrirConf(a, ancora);
+}
+let diaRenderizado = null;
+setInterval(()=>{
+  const h = hojeData(), chave = h.getFullYear()+"-"+h.getMonth()+"-"+h.getDate();
+  if(diaRenderizado && chave !== diaRenderizado && M){ render(); }      // virou o dia: recalcula os alertas
+  verificarPendencias();
+}, 60000);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) setTimeout(verificarPendencias, 300); });
+
+/* ---------- barra de formatação das OBSERVAÇÕES / OPERAÇÕES ---------- */
+function mostraFmt(t){
+  const f = $("fmt"), r = t.getBoundingClientRect();
+  f.style.display = "flex";
+  let top = r.top - f.offsetHeight - 6; if(top < 4) top = r.bottom + 6;
+  f.style.top = top+"px"; f.style.left = Math.max(4, Math.min(r.left, window.innerWidth - f.offsetWidth - 4))+"px";
+}
+document.addEventListener("focusin", ev=>{ const t = ev.target; if(t.classList && t.classList.contains("rt") && t.isContentEditable) mostraFmt(t); });
+document.addEventListener("focusout", ev=>{
+  if(ev.target.classList && ev.target.classList.contains("rt")) setTimeout(()=>{
+    const a = document.activeElement;
+    if(!(a && a.classList && a.classList.contains("rt"))) $("fmt").style.display = "none";
+  }, 150);
+});
+$("fmt").addEventListener("mousedown", ev=>ev.preventDefault());           // mantém o texto selecionado ao clicar nos botões
+$("fmt").addEventListener("click", ev=>{
+  const b = ev.target.closest("button[data-cmd]"); if(!b) return;
+  document.execCommand(b.dataset.cmd, false, null);
+  const t = document.activeElement; if(t && t.classList && t.classList.contains("rt")) lerEditavel({target:t});
+});
+document.addEventListener("paste", ev=>{                                    // colar sem trazer a formatação "suja" do Word/Excel/site
+  const t = ev.target.closest && ev.target.closest(".rt"); if(!t) return;
+  ev.preventDefault();
+  const cd = ev.clipboardData, html = cd.getData("text/html");
+  const ins = html ? limpaHtml(html) : esc(cd.getData("text/plain")).replace(/\r?\n/g,"<br>");
+  document.execCommand("insertHTML", false, ins);
+});
+
+/* ---------- submenu de situações (passar o mouse na coluna OBS) ---------- */
+let popTimer = null;
+function esconderPop(){ const p = $("pop"); if(p) p.style.display = "none"; }
+function mostrarPop(td){
+  clearTimeout(popTimer);
+  const e = M.eventos[+td.dataset.pop]; if(!e) return;
+  const rs = resumoStatus(e); if(!rs.dias.length) return;
+  const cont = {}; rs.dias.forEach(d=>{ const st = statusDia(e,d) || "SEM SITUAÇÃO"; cont[st] = (cont[st]||0)+1; });
+  const linhas = rs.dias.map(d=>{
+    const st = statusDia(e,d) || "SEM SITUAÇÃO", q = String(e.marcas[d]??"").trim();
+    return `<tr><td class="pd">${String(d).padStart(2,"0")}</td><td class="ps">${SEM[diaSemana(mes,d)]}</td><td class="pq">${q?("QTD "+esc(q)):"—"}</td><td><span class="chip g" style="background:${corStatus(st)}">${esc(st)}</span></td></tr>`;
+  }).join("");
+  const resumo = Object.entries(cont).map(([st,n])=>`<span class="chip" style="background:${corStatus(st)}">${esc(sigla(st))} ${n}</span>`).join(" ");
+  const p = $("pop");
+  p.innerHTML = `<div class="pt">${esc(e.nome)}</div><div class="pr">${rs.dias.length} lançamento${rs.dias.length>1?"s":""}: ${resumo}</div><table>${linhas}</table>`;
+  p.style.display = "block";
+  const r = td.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  let left = r.left - w - 8; if(left < 8) left = Math.min(window.innerWidth - w - 8, r.right + 8);
+  let top = r.top - 4; top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
+  p.style.left = left+"px"; p.style.top = top+"px";
+}
+$("mapaBox").addEventListener("mouseover", ev=>{
+  const td = ev.target.closest && ev.target.closest("td.o[data-pop]");
+  if(td) mostrarPop(td);
+});
+$("mapaBox").addEventListener("mouseout", ev=>{
+  const td = ev.target.closest && ev.target.closest("td.o[data-pop]");
+  if(td){ clearTimeout(popTimer); popTimer = setTimeout(esconderPop,150); }
+});
+$("pop").addEventListener("mouseenter", ()=>clearTimeout(popTimer));
+$("pop").addEventListener("mouseleave", ()=>{ popTimer = setTimeout(esconderPop,120); });
+window.addEventListener("scroll", esconderPop, true);
+
+/* ---------- backup: exportar / importar ---------- */
+async function coletarTudo(){
+  const out = {};
+  if(sb){
+    const {data,error} = await sb.from("mapas").select("mes,dados").eq("user_id",donoId());
+    if(error) throw error;
+    (data||[]).forEach(r=>{ out[r.mes] = r.dados; });
+  } else {
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith("mapaop:")){ try{ out[k.slice(7)] = JSON.parse(localStorage.getItem(k)); }catch(e){} }
+    }
+  }
+  return out;
+}
+$("bExp").onclick = async ()=>{
+  try{
+    if(timer){ clearTimeout(timer); salvarAgora(); }
+    const meses = await coletarTudo();
+    const blob = new Blob([JSON.stringify({sistema:"mapa-operacional",versao:1,exportado:new Date().toISOString(),meses},null,1)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "mapa_operacional_backup_"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    $("impMsg").textContent = "Exportado: "+Object.keys(meses).length+" registro(s).";
+  }catch(e){ $("impMsg").textContent = "Erro ao exportar: "+(e.message||e); }
+};
+$("impArq").addEventListener("change", ev=>{
+  const f = ev.target.files && ev.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = ()=>{ $("impTxt").value = String(r.result||""); }; r.readAsText(f);
+});
+function interpretarBackup(txt){
+  let o = JSON.parse(txt);
+  const meses = {};
+  const add = (k,v)=>{
+    if(typeof v==="string"){ try{ v = JSON.parse(v); }catch(e){ return; } }
+    if(!v || typeof v!=="object") return;
+    if(/^\d{4}-\d{2}$/.test(k) || k==="catalogo") meses[k] = v;
+  };
+  if(o && o.meses && typeof o.meses==="object"){ Object.entries(o.meses).forEach(([k,v])=>add(k,v)); }
+  else if(o && typeof o==="object"){
+    Object.entries(o).forEach(([k,v])=>{ if(k.startsWith("mapaop:")) add(k.slice(7),v); else add(k,v); });
+  }
+  return meses;
+}
+$("bImp").onclick = async ()=>{
+  const msg = $("impMsg");
+  let meses;
+  try{ meses = interpretarBackup($("impTxt").value); }catch(e){ msg.textContent = "Conteúdo inválido (não é JSON)."; return; }
+  const chaves = Object.keys(meses);
+  if(!chaves.length){ msg.textContent = "Nenhum mês encontrado no conteúdo."; return; }
+  const lista = chaves.filter(k=>k!=="catalogo").sort();
+  if(!confirm("Importar "+lista.length+" mês(es)"+(lista.length?": "+lista.join(", "):"")+(meses.catalogo?" e o banco de eventos":"")+"?\nMeses já existentes serão substituídos.")) return;
+  try{
+    for(const k of chaves){
+      let d = meses[k];
+      if(k!=="catalogo") normalizar(d);
+      if(sb){
+        const r = await sb.from("mapas").upsert({user_id:donoId(),mes:k,dados:d,atualizado:new Date().toISOString()});
+        if(r.error) throw r.error;
+      } else localStorage.setItem(k==="catalogo" ? "mapaop:catalogo" : chaveLocal(k), JSON.stringify(d));
+    }
+    await carregarCat(); await carregar(mes); render();
+    $("impTxt").value = ""; $("impArq").value = "";
+    msg.textContent = "Importado: "+chaves.length+" registro(s).";
+  }catch(e){ msg.textContent = "Erro ao importar: "+(e.message||e); }
+};
+$("fEv").onchange = atualizaPlaceholders;
+$("btnImp").onclick = ()=>window.print();
+
+$("selMes").innerHTML = MESES.map((n,i)=>`<option value="${i+1}">${n}</option>`).join("");
+function mostraMes(){ const [a,b]=mes.split("-"); $("selMes").value=String(+b); $("anoMes").value=a; }
+async function mudarMes(novo){
+  if(!/^\d{4}-\d{2}$/.test(novo)) return;
+  if(timer){ clearTimeout(timer); salvarAgora(); }
+  mes = novo; mostraMes(); await carregar(mes); atualizaModo(); render();
+}
+function mesDoForm(){ const a=+$("anoMes").value; if(!a||a<2000||a>2100) return null; return a+"-"+String($("selMes").value).padStart(2,"0"); }
+$("selMes").onchange = ()=>{ const m=mesDoForm(); if(m) mudarMes(m); };
+$("anoMes").onchange = ()=>{ const m=mesDoForm(); if(m) mudarMes(m); };
+function deslocaMes(k){ const [a,b]=mes.split("-").map(Number); const d=new Date(a,b-1+k,1); mudarMes(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); }
+$("bMesAnt").onclick = ()=>deslocaMes(-1);
+$("bMesPro").onclick = ()=>deslocaMes(1);
+
+/* ---------- acesso ---------- */
+function atualizaModo(){
+  let t = "Modo local (sem login)";
+  if(sb){
+    const comp = compartilhado;
+    t = comp ? ("Equipe · "+(LEITOR?"leitor":"editor")) : "Mapa individual";
+    if(comp && semDados) t += " · sem dados neste mês";
+  }
+  $("navModo").textContent = t;
+}
+function horaAgora(){ return new Date().toLocaleTimeString("pt-BR"); }
+function marcaAtualizado(){
+  const t = "Atualizado às "+horaAgora();
+  $("tvHora").textContent = t;
+  if(!timer) $("estado").textContent = sb ? t : "Modo local (sem login)";
+}
+let atualizando = false;
+async function atualizarRemoto(){
+  if(!sb || !user || !mes || atualizando) return;
+  if(timer || salvando) return;                       // há edição local ainda não salva (ou salvando agora)
+  const a = document.activeElement;
+  if(!TV && a && (a.isContentEditable || (/^(INPUT|TEXTAREA)$/.test(a.tagName) && a.value))) return;   // alguém digitando
+  atualizando = true;
+  try{
+    if(TV && mesAtual() !== mes){                     // na TV acompanha o mês corrente sozinho
+      mes = mesAtual(); mostraMes(); await carregar(mes); render(); marcaAtualizado(); return;
+    }
+    const {data,error} = await sb.from("mapas").select("atualizado").eq("user_id",donoId()).eq("mes",mes).maybeSingle();
+    if(error){ $("estado").textContent = "Sem conexão — tentando de novo…"; $("tvHora").textContent = "Sem conexão — tentando de novo…"; return; }
+    const t = (data && data.atualizado) ? new Date(data.atualizado).getTime() : null;
+    if(t !== versaoRemota){ await carregar(mes); await carregarCat(); render(); }
+    marcaAtualizado();
+  }catch(e){
+    $("estado").textContent = "Sem conexão — tentando de novo…";
+  }finally{ atualizando = false; }
+}
+let pollId = null;
+function iniciarAtualizacao(){
+  if(!sb || pollId) return;
+  const seg = Math.max(5, parseInt(PARAMS.get("seg"),10) || (TV ? 20 : 30));
+  pollId = setInterval(atualizarRemoto, seg*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) atualizarRemoto(); });
+  window.addEventListener("online", atualizarRemoto);
+}
+async function entrar(u){
+  user = u;
+  $("login").style.display="none"; $("app").style.display="flex";
+  $("btnSair").style.display = sb ? "inline-block" : "none";
+  $("navSair").style.display = sb ? "block" : "none";
+  $("tvContaBox").style.display = sb ? "inline" : "none";
+  { const nome = sb ? (user.email||"Usuário") : "Modo local"; $("navUser").textContent = nome; $("navIni").textContent = nome.charAt(0).toUpperCase(); }
+  if(sb){                                                  // consulta a tabela "acesso": papel e dono dos dados deste e-mail
+    const email = String(user.email||"").toLowerCase();
+    const bloquear = async (msg)=>{
+      $("app").style.display = "none"; $("login").style.display = "block"; $("erro").textContent = msg;
+      try{ await sb.auth.signOut(); }catch(e){}
+    };
+    const r = await sb.from("acesso").select("papel,dono").eq("email", email).maybeSingle();
+    const semTabela = r.error && (/42P01|PGRST205/.test(String(r.error.code||"")) || /does not exist|schema cache|could not find the table/i.test(String(r.error.message||"")));
+    if(r.error && !semTabela){ await bloquear("Não foi possível verificar o acesso ("+r.error.message+")."); return; }
+    if(semTabela){
+      if(DONO_ID){ await bloquear("A tabela acesso não existe. Rode o arquivo schema_compartilhado.sql no SQL Editor do Supabase."); return; }
+      // sem tabela e sem UID configurado: cada usuário usa o próprio mapa
+    } else {
+      if(!r.data){ await bloquear("Este e-mail ("+email+") não tem acesso ao mapa. Peça ao administrador para cadastrá-lo."); return; }
+      if(r.data.dono) DONO_ID = r.data.dono;
+      if(!DONO_ID){ await bloquear("O acesso deste e-mail está sem dono definido. Rode de novo o schema_compartilhado.sql atualizado."); return; }
+      compartilhado = true;
+      LEITOR = r.data.papel === "leitor";
+      if(LEITOR) document.body.classList.add("leitor");
+    }
+    if(DONO_ID) compartilhado = true;
+  }
+  mes = mesAtual(); mostraMes();
+  await carregarCat();
+  await carregar(mes); render();
+  atualizaModo();
+  if(LEITOR) abrirPainel(false);
+  if(TV){ document.body.classList.add("tv"); abrirPainel(false); ajustar(); }
+  marcaAtualizado();
+  iniciarAtualizacao();
+}
+$("login").addEventListener("submit", async ev=>{
+  ev.preventDefault(); $("erro").textContent="";
+  if(!sb){ $("erro").textContent = "Login indisponível: recarregue a página (Ctrl+F5)."; return; }
+  let data, error;
+  try{ ({data,error} = await sb.auth.signInWithPassword({email:$("em").value.trim(),password:$("sn").value})); }
+  catch(e){ error = e; }
+  if(error){ $("erro").textContent = traduzErro(error); return; }
+  entrar(data.user);
+});
+$("verSn").onchange = ()=>{ $("sn").type = $("verSn").checked ? "text" : "password"; };
+
+function traduzErro(e){
+  const m = String((e && e.message) || e || "");
+  const cod = (e && (e.code || e.status)) ? " ["+(e.code||e.status)+"]" : "";
+  if(/invalid path|not found|404/i.test(m) || (e && e.status===404)) return "O endereço do Supabase está errado (404). Em SUPABASE_URL use somente https://xxxx.supabase.co, copiado de Project Settings > Data API."+cod;
+  if(/invalid login credentials/i.test(m)) return "E-mail ou senha não conferem (ou o usuário não existe neste projeto)."+cod;
+  if(/email not confirmed/i.test(m)) return "Usuário não confirmado. No Supabase, abra Authentication > Users e confirme o usuário (ou recrie com Auto Confirm User)."+cod;
+  if(/invalid api key|apikey|jwt|no api key/i.test(m)) return "Chave do Supabase inválida. Confira o valor de SUPABASE_KEY no arquivo (use a anon/publishable)."+cod;
+  if(/failed to fetch|network|load failed|fetch/i.test(m)) return "Não consegui conectar ao Supabase. Confira SUPABASE_URL no arquivo e a internet."+cod;
+  if(/rate limit|too many/i.test(m)) return "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo."+cod;
+  if(/signups? not allowed|disabled/i.test(m)) return "Login por e-mail e senha está desativado no projeto (Authentication > Providers > Email)."+cod;
+  return "Erro do Supabase: "+m+cod;
+}
+/* confere a configuração e avisa na própria tela de login */
+(function(){
+  const av = [];
+  const bruta = String(SUPABASE_URL||"").trim();
+  if(bruta && SB_URL !== bruta.replace(/\/+$/,"")) av.push("O endereço colado tinha sobras e foi ajustado automaticamente para "+SB_URL+". Confira se é o do seu projeto.");
+  if(SB_URL && !/^https:\/\/[a-z0-9]{10,}\.supabase\.co$/i.test(SB_URL)) av.push("SUPABASE_URL não parece um endereço de projeto Supabase (o formato é https://xxxx.supabase.co).");
+  if(SB_KEY && /^sb_secret_/i.test(SB_KEY)) av.push("Você colocou uma chave SECRETA. Troque pela anon/publishable e apague a secreta do arquivo.");
+  else if(SB_KEY && !/^(eyJ|sb_publishable_)/.test(SB_KEY)) av.push("SUPABASE_KEY não parece uma chave anon/publishable (deve começar com eyJ ou sb_publishable_).");
+  const dono = String(DONO_COMPARTILHADO||"d2d06889-3d07-409c-a74f-9f0d00d8e337").trim();
+  if(dono && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dono)) av.push("DONO_COMPARTILHADO não parece um UID válido (formato 8-4-4-4-12, copiado de Authentication > Users).");
+  if(sb && av.length) $("aviso").textContent = av.join(" ");
+})();
+async function sairConta(){
+  if(timer){ clearTimeout(timer); salvarAgora(); await new Promise(r=>setTimeout(r,800)); }   // não perde a última edição
+  if(sb){
+    // scope "local": sai só deste aparelho (não derruba a TV nem outros computadores logados com o mesmo usuário)
+    try{ await Promise.race([ sb.auth.signOut({scope:"local"}), new Promise(r=>setTimeout(r,3000)) ]); }catch(e){}
+    // se o servidor não respondeu, o supabase-js mantém a sessão guardada: apaga na marra
+    try{ [localStorage, sessionStorage].forEach(st=>Object.keys(st).filter(k=>/^sb-.+-auth-token/.test(k) || k.indexOf("supabase.auth")===0).forEach(k=>st.removeItem(k))); }catch(e){}
+  }
+  location.href = location.pathname;   // volta ao login, sem ?tv=1
+}
+$("btnSair").onclick = sairConta;
+$("navSair").onclick = sairConta;
+$("tvSairConta").addEventListener("click", ev=>{ ev.preventDefault(); sairConta(); });
+window.addEventListener("beforeunload", ()=>{ if(timer){ clearTimeout(timer); salvarAgora(); } });
+
+if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+  setInterval(()=>document.body.classList.toggle("pisca"),1000);
+}
+
+function ajustar(dim){
+  const box = $("corpoBox"), c = $("corpo");
+  if(!box || !c) return;
+  c.style.transform = "none";
+  const r0 = c.getBoundingClientRect();
+  let w = c.scrollWidth, h = c.scrollHeight;
+  c.querySelectorAll("*").forEach(el=>{
+    const r = el.getBoundingClientRect();
+    w = Math.max(w, Math.ceil(r.right - r0.left)); h = Math.max(h, Math.ceil(r.bottom - r0.top));
+  });
+  if(!w || !h) return;
+  const aw = dim ? dim.w : box.clientWidth - 8;
+  const ah = dim ? dim.h : box.clientHeight - 8;
+  const k = Math.min(aw/w, ah/h, TV ? 2.6 : 1.6);
+  const ox = dim ? 0 : Math.max(0, (box.clientWidth - w*k)/2);
+  c.style.transform = "translate("+ox+"px,0px) scale("+k+")";
+  box.style.height = dim ? Math.ceil(h*k)+"px" : "";
+}
+let painelOculto = false;
+function alternarPainel(){ abrirPainel(painelOculto); if(!painelOculto) { const b=$("navItens").children[abaAtiva>=0?abaAtiva:1]; if(b && !b.classList.contains("on")) {abaAtiva=-1; b.click();} } }
+$("btnVisao").onclick = alternarPainel;
+$("btnTV").onclick = ()=>{ location.href = location.pathname + "?tv=1"; };
+window.addEventListener("resize", ()=>ajustar());
+window.addEventListener("beforeprint", ()=>ajustar({w:1040,h:700}));
+window.addEventListener("afterprint", ()=>ajustar());
+
+/* menu lateral: cada item abre o formulário correspondente */
+const ICONES = {
+  "Mês":'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  "Lançar evento":'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+  "Novo evento":'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  "Pelotão":'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  "GU's":'<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.5 0 4 1.8 4 4"/>',
+  "Revista":'<path d="M6 3h8l4 4v14H6z"/><path d="M9 14l2 2 4-4"/>',
+  "Dados":'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>'
+};
+let abaAtiva = -1;
+function abrirPainel(aberto){
+  painelOculto = !aberto;
+  $("painel").style.display = aberto ? "" : "none";
+  $("btnVisao").textContent = aberto ? "Tela cheia do mapa" : "Mostrar painel";
+  ajustar();
+}
+(function(){
+  const cards = [...document.querySelectorAll("#painel .card")];
+  const nomes = ["Mês","Lançar evento","Novo evento","Pelotão","GU's","Revista","Dados"];
+  const box = $("navItens");
+  cards.forEach((c,i)=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'+(ICONES[nomes[i]]||"")+'</svg><span>'+(nomes[i]||("Item "+(i+1)))+'</span>';
+    b.onclick = ()=>{
+      if(abaAtiva===i && !painelOculto){ abrirPainel(false); [...box.children].forEach(x=>x.classList.remove("on")); abaAtiva=-1; return; }
+      abaAtiva = i;
+      cards.forEach((x,j)=>x.classList.toggle("on", j===i));
+      [...box.children].forEach((x,j)=>x.classList.toggle("on", j===i));
+      if(painelOculto) abrirPainel(true);
+    };
+    box.appendChild(b);
+  });
+  box.children[1] && box.children[1].click();
+})();
+$("btnMenu").onclick = ()=>{ document.body.classList.toggle("nav-recolhida"); ajustar(); };
+if(window.innerWidth < 800) document.body.classList.add("nav-recolhida");
+
+/* ---------- convite / recuperação de senha ---------- */
+function paramsDoHash(h){ return new URLSearchParams(String(h||"").replace(/^#/,"")); }
+const HP = paramsDoHash(HASH_INICIAL);
+const TIPO_LINK = HP.get("type");                       // invite | recovery | signup | magiclink
+function limparHash(){ try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){} }
+function mostrarDefinirSenha(usuario){
+  $("login").style.display = "none"; $("app").style.display = "none";
+  $("definirSenha").style.display = "block";
+  $("defInfo").textContent = usuario && usuario.email ? "Conta: "+usuario.email : "";
+  $("nsn").focus();
+}
+$("verNsn").onchange = ()=>{ const t = $("verNsn").checked ? "text" : "password"; $("nsn").type = t; $("nsn2").type = t; };
+$("definirSenha").addEventListener("submit", async ev=>{
+  ev.preventDefault(); const er = $("erro2"); er.textContent = "";
+  const a = $("nsn").value, b2 = $("nsn2").value;
+  if(a.length < 8){ er.textContent = "A senha precisa ter pelo menos 8 caracteres."; return; }
+  if(a !== b2){ er.textContent = "As duas senhas não são iguais."; return; }
+  if(!sb){ er.textContent = "Login indisponível: recarregue a página (Ctrl+F5)."; return; }
+  let res;
+  try{ res = await sb.auth.updateUser({password:a}); }catch(e){ res = {error:e}; }
+  if(res.error){
+    const m = String(res.error.message||"");
+    er.textContent = /same password|different from the old/i.test(m) ? "Escolha uma senha diferente da anterior."
+      : /weak|short|at least/i.test(m) ? "Senha fraca ou curta demais. Use 8 ou mais caracteres, com letras e números."
+      : /session|jwt|not authenticated|missing/i.test(m) ? "O link expirou ou já foi usado. Peça um novo convite ou use \"Esqueci a senha\" na tela de entrada."
+      : "Não foi possível salvar a senha: "+m;
+    return;
+  }
+  limparHash();
+  $("definirSenha").style.display = "none";
+  entrar(res.data.user);
+});
+$("esqueci").addEventListener("click", async ev=>{
+  ev.preventDefault();
+  const email = $("em").value.trim(), er = $("erro");
+  if(!email){ er.textContent = "Digite seu e-mail no campo acima e clique de novo em \"Esqueci a senha\"."; return; }
+  if(!sb){ er.textContent = "Login indisponível: recarregue a página (Ctrl+F5)."; return; }
+  if(location.protocol === "file:"){ er.textContent = "Para recuperar a senha, use o endereço publicado do site (https://…), não o arquivo aberto no computador."; return; }
+  let res;
+  try{ res = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.origin + location.pathname}); }catch(e){ res = {error:e}; }
+  er.style.color = res.error ? "#b00020" : "#1f6b2a";
+  er.textContent = res.error ? traduzErro(res.error) : "Se o e-mail estiver cadastrado, enviamos um link para criar uma nova senha. Abra-o no mesmo navegador.";
+  setTimeout(()=>{ er.style.color = ""; }, 100);
+});
+
+(async function iniciar(){
+  if(!sb){
+    if(SUPABASE_URL && SUPABASE_KEY){   // configurado, mas a biblioteca de login não carregou: não abrir sem proteção
+      $("login").style.display = "block";
+      $("erro").textContent = "Não foi possível carregar o sistema de login (biblioteca do Supabase bloqueada ou sem internet). Recarregue a página com Ctrl+F5 ou tente em outra rede.";
+      return;
+    }
+    entrar({id:"local"}); return;
+  }
+  const {data} = await sb.auth.getSession();
+  // link de convite ou de recuperação: a pessoa precisa definir a senha antes de usar o sistema
+  if(data.session && (TIPO_LINK==="invite" || TIPO_LINK==="recovery")){ mostrarDefinirSenha(data.session.user); return; }
+  if(data.session){ entrar(data.session.user); return; }
+  $("login").style.display = "block";
+  if(HP.get("error") || HP.get("error_code")){
+    const cod = HP.get("error_code") || "";
+    $("erro").textContent = /expired|invalid/i.test(cod+" "+(HP.get("error_description")||""))
+      ? "O link do e-mail expirou ou já foi usado. Digite seu e-mail e clique em \"Esqueci a senha\" para receber um novo, ou peça outro convite ao administrador."
+      : "Não foi possível validar o link: "+(HP.get("error_description")||HP.get("error")).replace(/\+/g," ");
+    limparHash();
+  }
+})();
+</script>
+</body>
+</html>
